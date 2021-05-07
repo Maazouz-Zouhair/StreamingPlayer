@@ -1,15 +1,19 @@
 package com.aad.streamplayer;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
+import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -22,8 +26,10 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,24 +42,40 @@ public class MainActivity extends AppCompatActivity {
 
     public static final int PROGRESS = 0;
     public static final int RECONNECT = 1;
-
+    boolean isRecording=false;
     private TextView progress, duree, song_name;
     private ProgressBar pbTime;
     private ImageButton bPP;
-
+    private ImageButton microImage;
+    MediaRecorder myAudioRecorder ;
     //Indicates if music was chosen (is being played)
     private boolean isPlaying = false;
     //Which song from the list is currently being played
     private int songNumber = -1;
-
+    String outputfile;
+    String outputFile;
     private File fileList[];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[] { Manifest.permission.RECORD_AUDIO },
+                    10);
+        }
         setContentView(R.layout.activity_main);
         initViews();
         createList();
+        outputfile= Environment.getExternalStorageDirectory().getAbsolutePath()+"/recording_"+System.currentTimeMillis()+".mp3";
+
+
+
+        myAudioRecorder=new MediaRecorder();
+        myAudioRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        myAudioRecorder.setOutputFormat(MediaRecorder.OutputFormat.DEFAULT);
+        myAudioRecorder.setAudioEncoder(MediaRecorder.OutputFormat.DEFAULT);
+        myAudioRecorder.setOutputFile(outputfile);
         this.startService(new Intent(this, MyService.class));
     }
 
@@ -64,6 +86,8 @@ public class MainActivity extends AppCompatActivity {
         song_name = findViewById(R.id.songName);
         pbTime = findViewById(R.id.bpTime);
         bPP = findViewById(R.id.b_pp);
+        microImage = findViewById(R.id.microView);
+        microImage.setImageResource(R.drawable.ic_mic_black_24dp);
     }
 
     private void createList(){
@@ -168,6 +192,35 @@ public class MainActivity extends AppCompatActivity {
                 songNumber = fileList.length - 1;
             loadSong(fileList[songNumber], songNumber);
         }
+    }
+
+   public void clickMicro(View view) {
+            if(isRecording){
+                microImage.setImageResource(R.drawable.ic_mic_black_24dp);
+                isRecording=false;
+                try {
+                    myAudioRecorder.stop();
+                    myAudioRecorder.reset();
+                }catch (IllegalStateException ise){
+                    System.out.println("+++++++"+ise.getMessage()+"+++++++");
+
+                }
+            }else{
+
+                isRecording=true;
+                microImage.setImageResource(R.drawable.ic_pause_circle_filled_black_24dp);
+                Toast.makeText(MainActivity.this, "Recording started", Toast.LENGTH_LONG).show();
+                try {
+
+                    myAudioRecorder.prepare();
+                    myAudioRecorder.start();
+                } catch (IllegalStateException ise) {
+
+                } catch (IOException ioe) {
+                    System.out.println("+++++++++++++"+ ioe.getMessage()+"++++++++++++++++++++++++++++");
+                }
+
+            }
     }
 
     public void stopButton(View view) {
